@@ -4,7 +4,31 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"sync"
 )
+
+type dbStruct struct {
+	columnToFieldIndex map[string][]int
+}
+
+type dbStructCache struct {
+	sync.RWMutex
+	m map[reflect.Type]*dbStruct
+}
+
+func (c *dbStructCache) get(typ reflect.Type) *dbStruct {
+	c.RLock()
+	defer c.RUnlock()
+	return c.m[typ]
+}
+
+func (c *dbStructCache) set(typ reflect.Type, dbs *dbStruct) {
+	c.Lock()
+	defer c.Unlock()
+	c.m[typ] = dbs
+}
+
+var structCache = &dbStructCache{m: map[reflect.Type]*dbStruct{}}
 
 var dbStructTagKey = "db"
 
@@ -14,7 +38,15 @@ type toTraverse struct {
 	ColumnPrefix string
 }
 
+var UseStructCache = false
+
 func getColumnToFieldIndexMap(structType reflect.Type) map[string][]int {
+	if UseStructCache {
+		if col := structCache.get(structType); col != nil {
+			return col.columnToFieldIndex
+		}
+	}
+
 	result := make(map[string][]int, structType.NumField())
 	var queue []*toTraverse
 	queue = append(queue, &toTraverse{Type: structType, IndexPrefix: nil, ColumnPrefix: ""})
@@ -71,6 +103,9 @@ func getColumnToFieldIndexMap(structType reflect.Type) map[string][]int {
 		}
 	}
 
+	if UseStructCache {
+		structCache.set(structType, &dbStruct{columnToFieldIndex: result})
+	}
 	return result
 }
 
