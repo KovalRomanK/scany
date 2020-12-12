@@ -13,22 +13,44 @@ type dbStruct struct {
 
 type dbStructCache struct {
 	sync.RWMutex
-	m map[reflect.Type]*dbStruct
+	sync.Map
+	m  map[reflect.Type]*dbStruct
+	sm sync.Map
 }
 
+var UseStructCache = 0
+
 func (c *dbStructCache) get(typ reflect.Type) *dbStruct {
-	c.RLock()
-	defer c.RUnlock()
-	return c.m[typ]
+	if UseStructCache == 1 {
+		c.RLock()
+		defer c.RUnlock()
+		return c.m[typ]
+	}
+	if s, ok := c.sm.Load(typ); ok {
+		return s.(*dbStruct)
+	}
+	return nil
 }
 
 func (c *dbStructCache) set(typ reflect.Type, dbs *dbStruct) {
-	c.Lock()
-	defer c.Unlock()
-	c.m[typ] = dbs
+	if UseStructCache == 1 {
+		c.Lock()
+		defer c.Unlock()
+		c.m[typ] = dbs
+	}
+	c.sm.Store(typ, dbs)
+}
+
+func (c *dbStructCache) reset() {
+	c.m = map[reflect.Type]*dbStruct{}
+	c.sm = sync.Map{}
 }
 
 var structCache = &dbStructCache{m: map[reflect.Type]*dbStruct{}}
+
+func ResetStructCache() {
+	structCache.reset()
+}
 
 var dbStructTagKey = "db"
 
@@ -38,10 +60,8 @@ type toTraverse struct {
 	ColumnPrefix string
 }
 
-var UseStructCache = false
-
 func getColumnToFieldIndexMap(structType reflect.Type) map[string][]int {
-	if UseStructCache {
+	if UseStructCache > 0 {
 		if col := structCache.get(structType); col != nil {
 			return col.columnToFieldIndex
 		}
@@ -103,7 +123,7 @@ func getColumnToFieldIndexMap(structType reflect.Type) map[string][]int {
 		}
 	}
 
-	if UseStructCache {
+	if UseStructCache > 0 {
 		structCache.set(structType, &dbStruct{columnToFieldIndex: result})
 	}
 	return result

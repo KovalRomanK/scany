@@ -37,7 +37,41 @@ func (r *rows) Scan(dest ...interface{}) error {
 var err error
 
 func BenchmarkStruct(b *testing.B) {
-	dbscan.UseStructCache = false
+	dbscan.UseStructCache = 0
+	dbscan.ResetStructCache()
+	model := &Data{}
+	r := &rows{}
+	rs := dbscan.NewRowScanner(r)
+	for i := 0; i < b.N; i++ {
+		err = rs.Scan(model)
+	}
+}
+
+func BenchmarkStruct_MapCache(b *testing.B) {
+	dbscan.UseStructCache = 1
+	dbscan.ResetStructCache()
+	model := &Data{}
+	r := &rows{}
+	rs := dbscan.NewRowScanner(r)
+	for i := 0; i < b.N; i++ {
+		err = rs.Scan(model)
+	}
+}
+
+func BenchmarkStruct_SyncMapCache(b *testing.B) {
+	dbscan.UseStructCache = 2
+	dbscan.ResetStructCache()
+	model := &Data{}
+	r := &rows{}
+	rs := dbscan.NewRowScanner(r)
+	for i := 0; i < b.N; i++ {
+		err = rs.Scan(model)
+	}
+}
+
+func BenchmarkScannerStruct(b *testing.B) {
+	dbscan.UseStructCache = 0
+	dbscan.ResetStructCache()
 	model := &Data{}
 	r := &rows{}
 	for i := 0; i < b.N; i++ {
@@ -46,8 +80,20 @@ func BenchmarkStruct(b *testing.B) {
 	}
 }
 
-func BenchmarkStructCache(b *testing.B) {
-	dbscan.UseStructCache = true
+func BenchmarkScannerStruct_MapCache(b *testing.B) {
+	dbscan.UseStructCache = 1
+	dbscan.ResetStructCache()
+	model := &Data{}
+	r := &rows{}
+	for i := 0; i < b.N; i++ {
+		rs := dbscan.NewRowScanner(r)
+		err = rs.Scan(model)
+	}
+}
+
+func BenchmarkScannerStruct_SyncMapCache(b *testing.B) {
+	dbscan.UseStructCache = 2
+	dbscan.ResetStructCache()
 	model := &Data{}
 	r := &rows{}
 	for i := 0; i < b.N; i++ {
